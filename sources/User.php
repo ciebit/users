@@ -65,4 +65,10 @@ class User
         $this->password = $password;
         return $this;
     }
+
+    public function setStatus(Status $status): self
+    {
+        $this->Status = $status;
+        return $this;
+    }
 }

@@ -31,6 +31,10 @@ class UsersTest extends TestCase
         $this->assertEquals(self::PASSWORD, $user->getPassword());
         $this->assertEquals(self::STATUS, $user->getStatus()->getValue());
 
+        $newStatus = 5;
+        $user->setStatus(new Status($newStatus));
+        $this->assertEquals($newStatus, $user->getStatus()->getValue());
+
         $usersCollection = new Collection();
         $usersCollection->add($user);
         $user1 = $usersCollection->getById(self::ID);
