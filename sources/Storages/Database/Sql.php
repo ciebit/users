@@ -103,6 +103,77 @@ class Sql extends SqlFilters implements Database
         return $this->createUser($usersData);
     }
 
+    public function store(User $user): Storage
+    {
+        $statement = $this->pdo->prepare("
+            INSERT INTO {$this->tableSave} (`id`, `username`, `password`, `email`, `status`)
+            VALUES (:id, :username, :password, :email, :status)
+        ");
+
+        $statement->bindValue(':id', (int) $user->getId(), PDO::PARAM_INT);
+        $statement->bindValue(':username', $user->getUsername(), PDO::PARAM_STR);
+        $statement->bindValue(':password', $user->getPassword(), PDO::PARAM_STR);
+        $statement->bindValue(':email', $user->getEmail(), PDO::PARAM_STR);
+        $statement->bindValue(':status', $user->getStatus()->getValue(), PDO::PARAM_INT);
+
+        $statement->execute();
+        
+        return $this;
+    }
+
+    public function update(User $user): Storage
+    {
+        $statement = $this->pdo->prepare("
+            UPDATE {$this->tableSave}
+            SET 
+            username = :username,
+            password = :password,
+            email = :email,
+            status = :status
+            WHERE id = :id;
+        ");
+
+        $statement->bindValue(':id', (int) $user->getId(), PDO::PARAM_INT);
+        $statement->bindValue(':username', $user->getUsername(), PDO::PARAM_STR);
+        $statement->bindValue(':password', $user->getPassword(), PDO::PARAM_STR);
+        $statement->bindValue(':email', $user->getEmail(), PDO::PARAM_STR);
+        $statement->bindValue(':status', $user->getStatus()->getValue(), PDO::PARAM_INT);
+
+        $statement->execute();
+        
+        return $this;
+    }
+
+    public function save(User $user): Storage
+    {
+        $statement = $this->pdo->prepare($sql="
+            SELECT * FROM {$this->tableGet} WHERE id = :id;
+        ");
+
+        $statement->bindValue(':id', (int) $user->getId(), PDO::PARAM_INT);
+        
+        $execute = $statement->execute();
+        $data = $statement->fetch(PDO::FETCH_ASSOC);
+
+        !$data ?
+        $this->store($user) :
+        $this->update($user);
+
+        return $this;
+    }
+
+    public function destroy(User $user): Storage
+    {
+        $statement = $this->pdo->prepare("
+            DELETE FROM {$this->tableGet} WHERE `id` = :id;
+        ");
+
+        $statement->bindValue(':id', (int) $user->getId(), PDO::PARAM_INT);
+        $statement->execute();
+
+        return $this;
+    }
+
     public function createUser(array $data): User
     {
         return (new User(

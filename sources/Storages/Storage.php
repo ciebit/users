@@ -19,6 +19,14 @@ interface Storage
 
     public function getAll(): Collection;
 
+    public function store(User $user): self;
+
+    public function update(User $user): self;
+
+    public function save(User $user): self;
+
+    public function destroy(User $user): self;
+
     public function setStartingLine(int $lineInit): self;
 
     public function setTotalLines(int $total): self;
