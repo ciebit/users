@@ -42,12 +42,6 @@ class User
         return $this->Status;
     }
 
-    public function passwordIsValid(string $password): bool
-    {
-        $hash = password_hash($password, PASSWORD_ARGON2I);
-        return password($password, $hash);
-    }
-
     public function setId(string $id): self
     {
         $this->id = $id;
