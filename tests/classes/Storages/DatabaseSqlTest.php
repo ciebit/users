@@ -109,4 +109,73 @@ class DatabaseSqlTest extends Connection
         $user = $database->get();
         $this->assertEquals(3, $user->getId());
     }
+
+    public function testStore(): void
+    {
+        $id = '4';
+        $user = (new User('Peter', new Status(3)))
+        ->setId($id)
+        ->setPassword('spiderman159')
+        ->setEmail('peter.dog@parker.com');
+
+        $database = $this->getDatabase();
+        $database->store($user);
+
+        $database->addFilterById($id);
+        $this->assertEquals($user, $database->get());
+    }
+
+    public function testUpdate(): void
+    {
+        $id = '3';
+        $newUsername = 'Peter Véi';
+        $user = (new User($newUsername, new Status(5)))
+        ->setId($id)
+        ->setPassword('spiderdog')
+        ->setEmail('peter.dog@parker.com');
+
+        $database = $this->getDatabase();
+        $database->update($user);
+
+        $database->addFilterById($id);
+        $this->assertEquals($newUsername, $database->get()->getUsername());
+    }
+
+    public function testSave(): void
+    {
+        $id = '1';
+        $newUsername = 'Maike';
+        $user = (new User($newUsername, new Status(4)))
+        ->setId($id)
+        ->setPassword('heyholetsgo')
+        ->setEmail('maike@negreiros.com');
+
+        $database = $this->getDatabase();
+        $database->addFilterById($id);
+        $database->save($user);
+        $this->assertEquals($newUsername, $database->get()->getUsername());
+
+        $newId = '123456';
+        $user->setId($newId);
+        $database->addFilterById($newId);
+        $database->save($user);
+        $this->assertEquals($newUsername, $database->get()->getUsername());
+    }
+
+    public function testDestroy(): void
+    {
+        $id = '5';
+        $user = (new User('Peter', new Status(3)))
+        ->setId($id)
+        ->setPassword('spiderdog')
+        ->setEmail('peter.dog@parker.com');
+
+        $database = $this->getDatabase();
+        $database->store($user);
+        $database->addFilterById($id);
+        $this->assertEquals($id, $database->get()->getId());
+
+        $database->destroy($user);
+        $this->assertEquals(null, $database->get());
+    }
 }
