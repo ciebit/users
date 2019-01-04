@@ -7,7 +7,5 @@ use Ciebit\Users\Storages\Storage;
 
 interface Database extends Storage
 {
-    public function setTableGet(string $name): self;
-
-    public function setTableSave(string $name): self;
+    public function setTable(string $name): self;
 }

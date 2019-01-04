@@ -15,62 +15,63 @@ class DatabaseSqlTest extends Connection
         return new DatabaseSql($pdo);
     }
 
-    public function testGet(): void
+    public function testFindOne(): void
     {
         $database = $this->getDatabase();
-        $user = $database->get();
+        $user = $database->findOne();
         $this->assertInstanceOf(User::class, $user);
     }
 
-    public function testGetAll(): void
+    public function testFindAll(): void
     {
         $database = $this->getDatabase();
-        $users = $database->getAll();
+        $users = $database->findAll();
         $this->assertInstanceOf(Collection::class, $users);
-        $this->assertCount(3, $users->getIterator());
+        $this->assertCount(3, $users);
     }
 
-    public function testGetAllBugUniqueValue(): void
+    public function testFindAllBugUniqueValue(): void
     {
         $database = $this->getDatabase();
-        $database->addFilterByIds('=', 1, 2);
-        $users = $database->getAll();
+        $database->addFilterById('=', 1, 2);
+        $users = $database->findAll();
         $this->assertInstanceOf(Collection::class, $users);
+        $this->assertCount(2, $users);
     }
 
-    public function testGetAllFilterById(): void
+    public function testFindAllFilterById(): void
     {
         $id = 3;
         $database = $this->getDatabase();
-        $database->addFilterById($id+0);
-        $users = $database->getAll();
-        $this->assertCount(1, $users->getIterator());
+        $database->addFilterById('=', $id+0);
+        $users = $database->findAll();
+        $this->assertCount(1, $users);
         $this->assertEquals($id, $users->getArrayObject()->offsetGet(0)->getId());
     }
 
-    public function testGetAllFilterByStatus(): void
+    public function testFindAllFilterByStatus(): void
     {
         $database = $this->getDatabase();
-        $database->addFilterByStatus(Status::ACTIVE());
-        $users = $database->getAll();
-        $this->assertCount(1, $users->getIterator());
+        $database->addFilterByStatus('=', Status::ACTIVE());
+        $users = $database->findAll();
+        $this->assertCount(1, $users);
         $this->assertEquals(Status::ACTIVE(), $users->getArrayObject()->offsetGet(0)->getStatus());
     }
 
-    public function testGetFilterById(): void
+    public function testFindOneFilterById(): void
     {
         $id = 2;
         $database = $this->getDatabase();
-        $database->addFilterById($id+0);
-        $user = $database->get();
+        $database->addFilterById('=', $id+0);
+        $user = $database->findOne();
         $this->assertEquals($id, $user->getId());
     }
 
-    public function testGetFilterByIds(): void
+    public function testFindOneFilterByIds(): void
     {
         $database = $this->getDatabase();
-        $database->addFilterByIds('=', 2, 3);
-        $user = $database->getAll();
+        $database->addFilterById('=', 2, 3);
+        $user = $database->findAll();
         $this->assertCount(2, $user);
         $this->assertEquals(2, $user->getById(2)->getId());
         $this->assertEquals(3, $user->getById(3)->getId());
@@ -80,33 +81,33 @@ class DatabaseSqlTest extends Connection
     {
         $username = 'player1';
         $database = $this->getDatabase();
-        $database->addFilterByUsername($username);
-        $user = $database->get();
+        $database->addFilterByUsername('=', $username);
+        $user = $database->findOne();
         $this->assertEquals($username, $user->getUsername());
     }
 
-    public function testGetFilterByEmail(): void
+    public function testFindOneFilterByEmail(): void
     {
         $email = 'gregorio@uol.com.br';
         $database = $this->getDatabase();
-        $database->addFilterByEmail($email);
-        $user = $database->get();
+        $database->addFilterByEmail('=', $email);
+        $user = $database->findOne();
         $this->assertEquals($email, $user->getEmail());
     }
 
-    public function testGetFilterByStatus(): void
+    public function testFindOneFilterByStatus(): void
     {
         $database = $this->getDatabase();
-        $database->addFilterByStatus(Status::ACTIVE());
-        $user = $database->get();
+        $database->addFilterByStatus('=', Status::ACTIVE());
+        $user = $database->findOne();
         $this->assertEquals(Status::ACTIVE(), $user->getStatus());
     }
 
-    public function testGetAllByOrderDesc(): void
+    public function testFindAllByOrderDesc(): void
     {
         $database = $this->getDatabase();
-        $database->orderBy('id', 'DESC');
-        $user = $database->get();
+        $database->addOrderBy($database::FIELD_ID, 'DESC');
+        $user = $database->findOne();
         $this->assertEquals(3, $user->getId());
     }
 
@@ -121,15 +122,15 @@ class DatabaseSqlTest extends Connection
         $database = $this->getDatabase();
         $database->store($user);
 
-        $database->addFilterById($id);
-        $this->assertEquals($user, $database->get());
+        $database->addFilterById('=', $id);
+        $this->assertEquals($user, $database->findOne());
     }
 
     public function testUpdate(): void
     {
         $id = '3';
         $newUsername = 'Peter Véi';
-        $user = (new User($newUsername, new Status(5)))
+        $user = (new User($newUsername, Status::INACTIVE()))
         ->setId($id)
         ->setPassword('spiderdog')
         ->setEmail('peter.dog@parker.com');
@@ -137,45 +138,41 @@ class DatabaseSqlTest extends Connection
         $database = $this->getDatabase();
         $database->update($user);
 
-        $database->addFilterById($id);
-        $this->assertEquals($newUsername, $database->get()->getUsername());
+        $database->addFilterById('=', $id);
+        $this->assertEquals($newUsername, $database->findOne()->getUsername());
     }
 
     public function testSave(): void
     {
-        $id = '1';
-        $newUsername = 'Maike';
-        $user = (new User($newUsername, new Status(4)))
-        ->setId($id)
+        $user = (new User('Maike', Status::TRASH()))
         ->setPassword('heyholetsgo')
         ->setEmail('maike@negreiros.com');
 
         $database = $this->getDatabase();
-        $database->addFilterById($id);
         $database->save($user);
-        $this->assertEquals($newUsername, $database->get()->getUsername());
+        $database->addFilterById('=', $user->getId());
+        $newUser = $database->findOne();
+        $this->assertEquals($user, $newUser);
 
-        $newId = '123456';
-        $user->setId($newId);
-        $database->addFilterById($newId);
+        $newEmail = 'contato@maikenegreiros.com';
+        $user->setEmail($newEmail.'');
         $database->save($user);
-        $this->assertEquals($newUsername, $database->get()->getUsername());
+        $database->addFilterById('=', $user->getId());
+        $this->assertEquals($newEmail, $database->findOne()->getEmail());
     }
 
     public function testDestroy(): void
     {
-        $id = '5';
-        $user = (new User('Peter', new Status(3)))
-        ->setId($id)
+        $user = (new User('Peter', Status::ACTIVE()))
         ->setPassword('spiderdog')
         ->setEmail('peter.dog@parker.com');
 
         $database = $this->getDatabase();
         $database->store($user);
-        $database->addFilterById($id);
-        $this->assertEquals($id, $database->get()->getId());
+        $database->addFilterById('=', $user->getId());
+        $this->assertEquals($user, $database->findOne());
 
         $database->destroy($user);
-        $this->assertEquals(null, $database->get());
+        $this->assertEquals(null, $database->findOne());
     }
 }
