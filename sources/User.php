@@ -5,16 +5,28 @@ use Ciebit\Users\Status;
 
 class User
 {
-    private $id; #string
-    private $username; #string
-    private $email; #string
-    private $password; #string
-    private $Status; #Status
+    /** @var string */
+    private $id;
+
+    /** @var string */
+    private $username;
+
+    /** @var string */
+    private $email;
+
+    /** @var string */
+    private $password;
+
+    /** @var Status */
+    private $Status;
 
     public function __construct(string $username, Status $status)
     {
-        $this->username = $username;
+        $this->email = '';
+        $this->id = '';
+        $this->password = '';
         $this->Status = $status;
+        $this->username = $username;
     }
 
     public function getId(): string
@@ -40,12 +52,6 @@ class User
     public function getStatus(): Status
     {
         return $this->Status;
-    }
-
-    public function passwordIsValid(string $password): bool
-    {
-        $hash = password_hash($password, PASSWORD_ARGON2I);
-        return password($password, $hash);
     }
 
     public function setId(string $id): self
