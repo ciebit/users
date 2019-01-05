@@ -7,27 +7,27 @@ use Ciebit\Users\Status;
 
 interface Storage
 {
-    public function addFilterById(int $id, string $operator = '='): self;
+    public function addFilterByEmail(string $operator = '=', string ...$email): self;
 
-    public function addFilterByUsername(string $username, string $operator = '='): self;
+    public function addFilterById(string $operator = '=', int ...$id): self;
 
-    public function addFilterByEmail(string $email, string $operator = '='): self;
+    public function addFilterByStatus(string $operator = '=', Status ...$status): self;
 
-    public function addFilterByStatus(Status $status, string $operator = '='): self;
+    public function addFilterByUsername(string $operator = '=', string ...$username): self;
 
-    public function get(): ?User;
+    public function destroy(User $user): self;
 
-    public function getAll(): Collection;
+    public function findOne(): ?User;
+
+    public function findAll(): Collection;
+
+    public function save(User $user): self;
+
+    public function setLimit(int $limit): self;
+
+    public function setOffset(int $offset): self;
 
     public function store(User $user): self;
 
     public function update(User $user): self;
-
-    public function save(User $user): self;
-
-    public function destroy(User $user): self;
-
-    public function setStartingLine(int $lineInit): self;
-
-    public function setTotalLines(int $total): self;
 }

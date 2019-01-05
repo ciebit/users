@@ -6,6 +6,7 @@ use Ciebit\Users\User;
 use Ciebit\Users\Collection;
 use Ciebit\Users\Status;
 use Ciebit\Users\Storages\Storage;
+use Ciebit\Users\Storages\Database\SqlHelper;
 use Exception;
 use PDO;
 
@@ -16,161 +17,75 @@ use function array_merge;
 use function array_unique;
 use function count;
 use function explode;
+use function implode;
 use function is_aray;
 use function intval;
 
-class Sql extends SqlFilters implements Database
+class Sql implements Database
 {
+    public const FIELD_EMAIL = 'email';
+    public const FIELD_ID = 'id';
+    public const FIELD_PASSWORD = 'password';
+    public const FIELD_STATUS = 'status';
+    public const FIELD_USERNAME = 'username';
+
+    /** @var int */
     static private $counterKey = 0;
-    private $pdo; #PDO
-    private $tableGet; #string
-    private $tableSave; #string
+
+    /** @var PDO */
+    private $pdo;
+
+    /** @var SqlHelper */
+    private $sqlHelper;
+
+    /** @var string */
+    private $table;
+
+    /** @var int */
+    private $totalItemsLastQuery;
 
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
-        $this->tableGet = 'cb_users';
-        $this->tableSave = 'cb_users';
+        $this->sqlHelper = new SqlHelper;
+        $this->table = 'cb_users';
+        $this->totalItemsLastQuery = 0;
     }
 
-    public function addFilterById(int $id, string $operator = '='): Storage
+    private function addFilter(string $fieldName, int $type, string $operator, ...$value): self
     {
-        $key = 'id';
-        $sql = "`users`.`id` $operator :{$key}";
-        $this->addfilter($key, $sql, PDO::PARAM_STR, $id);
+        $field = "`{$this->table}`.`{$fieldName}`";
+        $this->sqlHelper->addFilterBy($field, $type, $operator, ...$value);
         return $this;
     }
 
-    public function addFilterByIds(string $operator, int ...$ids): Storage
+    public function addFilterByEmail(string $operator = '=', string ...$email): Storage
     {
-         $keyPrefix = 'id';
-         $keys = [];
-         $operator = $operator == '!=' ? 'NOT IN' : 'IN';
-         foreach ($ids as $id) {
-             $key = $keyPrefix . self::$counterKey++;
-             $this->addBind($key, PDO::PARAM_STR, $id);
-             $keys[] = $key;
-         }
-         $keysStr = implode(', :', $keys);
-         $this->addSqlFilter("`users`.`id` {$operator} (:{$keysStr})");
-         return $this;
-    }
-
-    public function addFilterByUsername(string $username, string $operator = '='): Storage
-    {
-        $key = 'username';
-        $sql = "`users`.`username` $operator :{$key}";
-        $this->addfilter($key, $sql, PDO::PARAM_STR, $username);
+        $this->addFilter(self::FIELD_EMAIL, PDO::PARAM_STR, $operator, ...$email);
         return $this;
     }
 
-    public function addFilterByEmail(string $email, string $operator = '='): Storage
+    public function addFilterById(string $operator = '=', int ...$id): Storage
     {
-        $key = 'email';
-        $sql = "`users`.`email` $operator :{$key}";
-        $this->addfilter($key, $sql, PDO::PARAM_STR, $email);
+        $this->addFilter(self::FIELD_ID, PDO::PARAM_STR, $operator, ...$id);
         return $this;
     }
 
-    public function addFilterByStatus(Status $status, string $operator = '='): Storage
+    public function addFilterByStatus(string $operator = '=', Status ...$status): Storage
     {
-        $key = 'status';
-        $sql = "`users`.`status` {$operator} :{$key}";
-        $this->addFilter($key, $sql, PDO::PARAM_INT, $status->getValue());
+        $this->addFilter(self::FIELD_STATUS, PDO::PARAM_INT, $operator, ...$status);
         return $this;
     }
 
-    public function get(): ?User
+    public function addFilterByUsername(string $operator = '=', string ...$username): Storage
     {
-        $statement = $this->pdo->prepare("
-            SELECT
-            {$this->getFields()}
-            FROM {$this->tableGet} as `users`
-            {$this->generateSqlJoin()}
-            WHERE {$this->generateSqlFilters()}
-            {$this->generateOrder()}
-            LIMIT 1
-        ");
-        $this->bind($statement);
-        if ($statement->execute() === false) {
-            throw new Exception('ciebit.users.storages.database.get_error', 2);
-        }
-        $usersData = $statement->fetch(PDO::FETCH_ASSOC);
-        if ($usersData == false) {
-            return null;
-        }
-
-        return $this->createUser($usersData);
-    }
-
-    public function store(User $user): Storage
-    {
-        $statement = $this->pdo->prepare("
-            INSERT INTO {$this->tableSave} (`id`, `username`, `password`, `email`, `status`)
-            VALUES (:id, :username, :password, :email, :status)
-        ");
-
-        $statement->bindValue(':id', (int) $user->getId(), PDO::PARAM_INT);
-        $statement->bindValue(':username', $user->getUsername(), PDO::PARAM_STR);
-        $statement->bindValue(':password', $user->getPassword(), PDO::PARAM_STR);
-        $statement->bindValue(':email', $user->getEmail(), PDO::PARAM_STR);
-        $statement->bindValue(':status', $user->getStatus()->getValue(), PDO::PARAM_INT);
-
-        $statement->execute();
-        
+        $this->addFilter(self::FIELD_USERNAME, PDO::PARAM_STR, $operator, ...$username);
         return $this;
     }
 
-    public function update(User $user): Storage
+    public function addOrderBy(string $column, string $order = "ASC"): Database
     {
-        $statement = $this->pdo->prepare("
-            UPDATE {$this->tableSave}
-            SET 
-            username = :username,
-            password = :password,
-            email = :email,
-            status = :status
-            WHERE id = :id;
-        ");
-
-        $statement->bindValue(':id', (int) $user->getId(), PDO::PARAM_INT);
-        $statement->bindValue(':username', $user->getUsername(), PDO::PARAM_STR);
-        $statement->bindValue(':password', $user->getPassword(), PDO::PARAM_STR);
-        $statement->bindValue(':email', $user->getEmail(), PDO::PARAM_STR);
-        $statement->bindValue(':status', $user->getStatus()->getValue(), PDO::PARAM_INT);
-
-        $statement->execute();
-        
-        return $this;
-    }
-
-    public function save(User $user): Storage
-    {
-        $statement = $this->pdo->prepare($sql="
-            SELECT * FROM {$this->tableGet} WHERE id = :id;
-        ");
-
-        $statement->bindValue(':id', (int) $user->getId(), PDO::PARAM_INT);
-        
-        $execute = $statement->execute();
-        $data = $statement->fetch(PDO::FETCH_ASSOC);
-
-        !$data ?
-        $this->store($user) :
-        $this->update($user);
-
-        return $this;
-    }
-
-    public function destroy(User $user): Storage
-    {
-        $statement = $this->pdo->prepare("
-            DELETE FROM {$this->tableGet} WHERE `id` = :id;
-        ");
-
-        $statement->bindValue(':id', (int) $user->getId(), PDO::PARAM_INT);
-        $statement->execute();
-
+        $this->sqlHelper->addOrderBy("`{$this->table}`.`{$column}`", $order);
         return $this;
     }
 
@@ -178,28 +93,100 @@ class Sql extends SqlFilters implements Database
     {
         return (new User(
             $data['username'] ?? '',
-            new Status((int) $data['status'] ?? new Status(5))
+            new Status((int) ($data['status'] ?? Status::INACTIVE))
         ))
         ->setId($data['id'] ?? '')
         ->setEmail($data['email'] ?? '')
         ->setPassword($data['password'] ?? '');
     }
 
-    public function getAll(): Collection
+    public function destroy(User $user): Storage
+    {
+        $fieldId = self::FIELD_ID;
+
+        $statement = $this->pdo->prepare("
+            DELETE FROM {$this->table} WHERE `{$fieldId}` = :id;
+        ");
+
+        $statement->bindValue(':id', (int) $user->getId(), PDO::PARAM_INT);
+        $statement->execute();
+
+        return $this;
+    }
+
+    private function getFields(): string
+    {
+        $table = $this->table;
+        $fields = [
+            self::FIELD_EMAIL,
+            self::FIELD_ID,
+            self::FIELD_STATUS,
+            self::FIELD_USERNAME,
+            self::FIELD_PASSWORD
+        ];
+
+        $fields = array_map(
+            function($field) use ($table){
+                return "`{$table}`.`{$field}`";
+            },
+            $fields
+        );
+
+        return implode(',', $fields);
+    }
+
+    public function getTotalRows(): int
+    {
+        return $this->totalItemsLastQuery;
+    }
+
+    /** @throws Exception */
+    public function findOne(): ?User
+    {
+        $statement = $this->pdo->prepare("
+            SELECT
+            {$this->getFields()}
+            FROM {$this->table}
+            {$this->sqlHelper->generateSqlJoin()}
+            WHERE {$this->sqlHelper->generateSqlFilters()}
+            {$this->sqlHelper->generateSqlOrder()}
+            LIMIT 1
+        ");
+
+        $this->sqlHelper->bind($statement);
+        if ($statement->execute() === false) {
+            throw new Exception('ciebit.users.storages.database.get_error', 2);
+        }
+
+        $usersData = $statement->fetch(PDO::FETCH_ASSOC);
+
+        if ($usersData == false) {
+            return null;
+        }
+
+        $this->totalItemsLastQuery = (int) $this->pdo->query('SELECT FOUND_ROWS()')->fetchColumn();
+
+        return $this->createUser($usersData);
+    }
+
+    /** @throws Exception */
+    public function findAll(): Collection
     {
         $statement = $this->pdo->prepare("
             SELECT SQL_CALC_FOUND_ROWS
             {$this->getFields()}
-            FROM {$this->tableGet} as `users`
-            {$this->generateSqlJoin()}
-            WHERE {$this->generateSqlFilters()}
-            {$this->generateOrder()}
-            {$this->generateSqlLimit()}
+            FROM {$this->table}
+            {$this->sqlHelper->generateSqlJoin()}
+            WHERE {$this->sqlHelper->generateSqlFilters()}
+            {$this->sqlHelper->generateSqlOrder()}
+            {$this->sqlHelper->generateSqlLimit()}
         ");
-        $this->bind($statement);
+
+        $this->sqlHelper->bind($statement);
         if ($statement->execute() === false) {
             throw new Exception('ciebit.users.storages.database.get_error', 2);
         }
+
         $collection = new Collection;
         $usersData = $statement->fetchAll(PDO::FETCH_ASSOC);
 
@@ -207,46 +194,98 @@ class Sql extends SqlFilters implements Database
             $user = $this->createUser($userData);
             $collection->add($user);
         }
+
+        $this->totalItemsLastQuery = (int) $this->pdo->query('SELECT FOUND_ROWS()')->fetchColumn();
+
         return $collection;
     }
 
-    private function getFields(): string
+    public function save(User $user): Storage
     {
-        return '
-            `users`.`id`,
-            `users`.`username`,
-            `users`.`password`,
-            `users`.`email`,
-            `users`.`status`
-        ';
-    }
+        $field = self::FIELD_ID;
+        $statement = $this->pdo->prepare(
+            "SELECT * FROM {$this->table} WHERE {$field} = :id;"
+        );
 
-    public function getTotalRows(): int
-    {
-        return (int) $this->pdo->query('SELECT FOUND_ROWS()')->fetchColumn();
-    }
+        $statement->bindValue(':id', (int) $user->getId(), PDO::PARAM_INT);
 
-    public function setStartingLine(int $lineInit): Storage
-    {
-        parent::setOffset($lineInit);
+        $execute = $statement->execute();
+        $data = $statement->fetch(PDO::FETCH_ASSOC);
+
+        !$data
+            ? $this->store($user)
+            : $this->update($user);
+
         return $this;
     }
 
-    public function setTableGet(string $name): Database
+    public function setLimit(int $total): Storage
     {
-        $this->tableGet = $name;
+        $this->sqlHelper->setLimit($total);
         return $this;
     }
 
-    public function setTableSave(string $name): Database
+    public function setOffset(int $offset): Storage
     {
-        $this->tableSave = $name;
+        $this->sqlHelper->setOffset($offset);
         return $this;
     }
 
-    public function setTotalLines(int $total): Storage
+    public function setTable(string $name): Database
     {
-        parent::setLimit($total);
+        $this->table = $name;
+        return $this;
+    }
+
+    public function store(User $user): Storage
+    {
+        $email = self::FIELD_EMAIL;
+        $password = self::FIELD_PASSWORD;
+        $status = self::FIELD_STATUS;
+        $username = self::FIELD_USERNAME;
+
+        $statement = $this->pdo->prepare(
+            "INSERT INTO {$this->table} (`{$username}`, `{$password}`, `{$email}`, `{$status}`)
+            VALUES (:username, :password, :email, :status)"
+        );
+
+        $statement->bindValue(':username', $user->getUsername(), PDO::PARAM_STR);
+        $statement->bindValue(':password', $user->getPassword(), PDO::PARAM_STR);
+        $statement->bindValue(':email', $user->getEmail(), PDO::PARAM_STR);
+        $statement->bindValue(':status', $user->getStatus()->getValue(), PDO::PARAM_INT);
+
+        $statement->execute();
+
+        $user->setId($this->pdo->lastInsertId());
+
+        return $this;
+    }
+
+    public function update(User $user): Storage
+    {
+        $email = self::FIELD_EMAIL;
+        $id = self::FIELD_ID;
+        $password = self::FIELD_PASSWORD;
+        $status = self::FIELD_STATUS;
+        $username = self::FIELD_USERNAME;
+
+        $statement = $this->pdo->prepare(
+            "UPDATE {$this->table} SET
+            {$username} = :username,
+            {$password} = :password,
+            {$email} = :email,
+            {$status} = :status
+            WHERE {$id} = :id;"
+        );
+
+        $statement->bindValue(':id', (int) $user->getId(), PDO::PARAM_INT);
+        $statement->bindValue(':username', $user->getUsername(), PDO::PARAM_STR);
+        $statement->bindValue(':password', $user->getPassword(), PDO::PARAM_STR);
+        $statement->bindValue(':email', $user->getEmail(), PDO::PARAM_STR);
+        $statement->bindValue(':status', $user->getStatus()->getValue(), PDO::PARAM_INT);
+
+        $statement->execute();
+
         return $this;
     }
 }
