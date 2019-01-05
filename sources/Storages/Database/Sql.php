@@ -71,6 +71,12 @@ class Sql implements Database
         return $this;
     }
 
+    public function addFilterByPassword(string $operator = '=', string ...$password): Storage
+    {
+        $this->addFilter(self::FIELD_PASSWORD, PDO::PARAM_STR, $operator, ...$password);
+        return $this;
+    }
+
     public function addFilterByStatus(string $operator = '=', Status ...$status): Storage
     {
         $this->addFilter(self::FIELD_STATUS, PDO::PARAM_INT, $operator, ...$status);
