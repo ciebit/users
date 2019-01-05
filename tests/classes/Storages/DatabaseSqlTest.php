@@ -77,6 +77,14 @@ class DatabaseSqlTest extends Connection
         $this->assertEquals(3, $user->getById(3)->getId());
     }
 
+    public function testFindOneFilterByPassword(): void
+    {
+        $database = $this->getDatabase();
+        $database->addFilterByPassword('=', 'tirodefaca');
+        $user = $database->findOne();
+        $this->assertEquals(3, $user->getId());
+    }
+
     public function testGetFilterByUsername(): void
     {
         $username = 'player1';

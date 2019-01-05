@@ -13,6 +13,8 @@ interface Storage
 
     public function addFilterByStatus(string $operator = '=', Status ...$status): self;
 
+    public function addFilterByPassword(string $operator = '=', string ...$password): self;
+
     public function addFilterByUsername(string $operator = '=', string ...$username): self;
 
     public function destroy(User $user): self;
