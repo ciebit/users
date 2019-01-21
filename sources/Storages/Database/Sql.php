@@ -67,7 +67,7 @@ class Sql implements Database
 
     public function addFilterById(string $operator = '=', int ...$id): Storage
     {
-        $this->addFilter(self::FIELD_ID, PDO::PARAM_STR, $operator, ...$id);
+        $this->addFilter(self::FIELD_ID, PDO::PARAM_INT, $operator, ...$id);
         return $this;
     }
 
@@ -79,6 +79,10 @@ class Sql implements Database
 
     public function addFilterByStatus(string $operator = '=', Status ...$status): Storage
     {
+        $status = array_map(
+            function($status){ return (int) $status->getValue(); },
+            $status
+        );
         $this->addFilter(self::FIELD_STATUS, PDO::PARAM_INT, $operator, ...$status);
         return $this;
     }
